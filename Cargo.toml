@@ -1,0 +1,10 @@
+[package]
+name = "pathforger"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+futures = "0.3.31"
+nt_client = "0.2.0"
+thiserror = { git = "https://github.com/onlycs/thiserror" }
+tokio = { version = "1.40.0", features = ["full"] }
