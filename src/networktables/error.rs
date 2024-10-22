@@ -30,4 +30,12 @@ pub enum PhotonWorkerError {
         location: &'static Location<'static>,
         backtrace: Backtrace,
     },
+
+    #[error("At {location}: Deserialization error:\n{source}")]
+    DeserializationError {
+        #[from]
+        source: bincode::error::DecodeError,
+        location: &'static Location<'static>,
+        backtrace: Backtrace,
+    },
 }

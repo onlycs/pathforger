@@ -3,6 +3,7 @@ pub mod error;
 
 use std::time::Duration;
 
+use bincode::{config, serde::decode_from_slice};
 use deser::*;
 use error::*;
 use futures::future::BoxFuture;
@@ -14,25 +15,16 @@ use nt_client::{
 };
 use tokio::runtime;
 
-pub async fn worker<C0, C1, C2>(
+pub async fn worker<'a, C0, C1, C2>(
     camera: String,
     on_robot_pose_update: C0,
     on_photon_update: C1,
     on_dest_update: C2,
 ) -> Result<!, PhotonWorkerError>
 where
-    C0: for<'a> Fn(&'a mut Publisher<RawData>, Transform3D) -> BoxFuture<'static, ()>
-        + Send
-        + Sync
-        + 'static,
-    C1: for<'a> Fn(&'a mut Publisher<RawData>, PhotonResult) -> BoxFuture<'static, ()>
-        + Send
-        + Sync
-        + 'static,
-    C2: for<'a> Fn(&'a mut Publisher<RawData>, Transform3D) -> BoxFuture<'static, ()>
-        + Send
-        + Sync
-        + 'static,
+    C0: for<'f> Fn(&'f mut Publisher<RawData>, Transform3D) -> BoxFuture<'f, ()> + Send + Sync + 'a,
+    C1: for<'f> Fn(&'f mut Publisher<RawData>, PhotonRes) -> BoxFuture<'f, ()> + Send + Sync + 'a,
+    C2: for<'f> Fn(&'f mut Publisher<RawData>, Transform3D) -> BoxFuture<'f, ()> + Send + Sync + 'a,
 {
     let nt = Client::new(Default::default());
 
@@ -81,9 +73,8 @@ where
         match photon_res {
             ReceivedMessage::Updated((_, value)) => {
                 if let Some(bytes) = value.as_slice() {
-                    let mut ptr = 0;
-                    let result = PhotonResult::parse_bytes(bytes, &mut ptr);
-                    rt.spawn(on_photon_update(&mut path_pub, result));
+                    let (result, _) = decode_from_slice(bytes, config::legacy())?;
+                    rt.block_on(on_photon_update(&mut path_pub, result));
                 };
             }
             _ => {}
@@ -92,9 +83,8 @@ where
         match pose_res {
             ReceivedMessage::Updated((_, value)) => {
                 if let Some(bytes) = value.as_slice() {
-                    let mut ptr = 0;
-                    let pose = Transform3D::parse_bytes(bytes, &mut ptr);
-                    rt.spawn(on_robot_pose_update(&mut path_pub, pose));
+                    let (pose, _) = decode_from_slice(bytes, config::legacy())?;
+                    rt.block_on(on_robot_pose_update(&mut path_pub, pose));
                 };
             }
             _ => {}
@@ -103,9 +93,8 @@ where
         match dest_res {
             ReceivedMessage::Updated((_, value)) => {
                 if let Some(bytes) = value.as_slice() {
-                    let mut ptr = 0;
-                    let dest = Transform3D::parse_bytes(bytes, &mut ptr);
-                    rt.spawn(on_dest_update(&mut path_pub, dest));
+                    let (dest, _) = decode_from_slice(bytes, config::legacy())?;
+                    rt.block_on(on_dest_update(&mut path_pub, dest));
                 };
             }
             _ => {}

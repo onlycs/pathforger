@@ -1,279 +1,242 @@
-use std::time::Duration;
+use core::f64;
+use serde::Deserialize;
+use std::{
+    hash::{Hash, Hasher},
+    time::Duration,
+};
 
-pub trait ByteParser {
-    fn parse_bytes(bytes: &[u8], ptr: &mut usize) -> Self;
-}
+mod deser {
+    use serde::de::Deserializer;
+    use serde::Deserialize;
+    use std::time::Duration;
 
-impl ByteParser for f64 {
-    fn parse_bytes(bytes: &[u8], ptr: &mut usize) -> Self {
-        let value = f64::from_le_bytes([
-            bytes[*ptr],
-            bytes[*ptr + 1],
-            bytes[*ptr + 2],
-            bytes[*ptr + 3],
-            bytes[*ptr + 4],
-            bytes[*ptr + 5],
-            bytes[*ptr + 6],
-            bytes[*ptr + 7],
-        ]);
-        *ptr += 8;
-        value
+    pub fn duration<'de, D>(deserializer: D) -> Result<Duration, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let micros = i64::deserialize(deserializer)?;
+        Ok(Duration::from_micros(micros as u64))
     }
-}
 
-impl ByteParser for i64 {
-    fn parse_bytes(bytes: &[u8], ptr: &mut usize) -> Self {
-        let value = i64::from_le_bytes([
-            bytes[*ptr],
-            bytes[*ptr + 1],
-            bytes[*ptr + 2],
-            bytes[*ptr + 3],
-            bytes[*ptr + 4],
-            bytes[*ptr + 5],
-            bytes[*ptr + 6],
-            bytes[*ptr + 7],
-        ]);
-        *ptr += 8;
-        value
+    pub fn u64<'de, D>(deserializer: D) -> Result<u64, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        Ok(i64::deserialize(deserializer)? as u64)
     }
-}
 
-impl ByteParser for u64 {
-    fn parse_bytes(bytes: &[u8], ptr: &mut usize) -> Self {
-        i64::parse_bytes(bytes, ptr) as u64
+    pub fn u16<'de, D>(deserializer: D) -> Result<u16, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        Ok(i32::deserialize(deserializer)? as u16)
     }
-}
 
-impl ByteParser for i32 {
-    fn parse_bytes(bytes: &[u8], ptr: &mut usize) -> Self {
-        let value = i32::from_le_bytes([
-            bytes[*ptr],
-            bytes[*ptr + 1],
-            bytes[*ptr + 2],
-            bytes[*ptr + 3],
-        ]);
-        *ptr += 4;
-        value
-    }
-}
+    pub fn ficudial_id<'de, D>(deserializer: D) -> Result<Option<u32>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let id = i32::deserialize(deserializer)?;
 
-impl ByteParser for f32 {
-    fn parse_bytes(bytes: &[u8], ptr: &mut usize) -> Self {
-        let value = f32::from_le_bytes([
-            bytes[*ptr],
-            bytes[*ptr + 1],
-            bytes[*ptr + 2],
-            bytes[*ptr + 3],
-        ]);
-        *ptr += 4;
-        value
-    }
-}
-
-impl ByteParser for bool {
-    fn parse_bytes(bytes: &[u8], ptr: &mut usize) -> Self {
-        let value = bytes[*ptr] != 0;
-        *ptr += 1;
-        value
-    }
-}
-
-impl<T: ByteParser> ByteParser for Option<T> {
-    fn parse_bytes(bytes: &[u8], ptr: &mut usize) -> Self {
-        let has_value = bool::parse_bytes(bytes, ptr);
-        if has_value {
-            Some(T::parse_bytes(bytes, ptr))
+        if id == -1 {
+            Ok(None)
         } else {
-            None
+            Ok(Some(id as u32))
         }
     }
-}
 
-impl<T: ByteParser> ByteParser for Vec<T> {
-    fn parse_bytes(bytes: &[u8], ptr: &mut usize) -> Self {
-        let len = bytes[*ptr] as usize;
-        *ptr += 1;
+    pub fn vec<'de, D, T>(deserializer: D) -> Result<Vec<T>, D::Error>
+    where
+        D: Deserializer<'de>,
+        T: Deserialize<'de>,
+    {
+        // i cannot be bothered.
+        let copier = || unsafe { std::mem::transmute_copy::<D, D>(&deserializer) };
 
+        let len = i8::deserialize(copier())? as usize;
         let mut vec = Vec::with_capacity(len);
+
         for _ in 0..len {
-            vec.push(T::parse_bytes(bytes, ptr));
+            vec.push(T::deserialize(copier())?);
         }
 
-        vec
+        Ok(vec)
     }
 }
 
-pub struct Translate3D {
-    pub x: f64,
-    pub y: f64,
-    pub z: f64,
-}
-
-impl ByteParser for Translate3D {
-    fn parse_bytes(bytes: &[u8], ptr: &mut usize) -> Self {
-        let x = f64::parse_bytes(bytes, ptr);
-        let y = f64::parse_bytes(bytes, ptr);
-        let z = f64::parse_bytes(bytes, ptr);
-
-        Translate3D { x, y, z }
-    }
-}
-
+#[derive(Clone, Copy, Debug, PartialEq, Deserialize)]
 pub struct Quaternion {
-    pub w: f64,
-    pub x: f64,
-    pub y: f64,
-    pub z: f64,
+    w: f64,
+    x: f64,
+    y: f64,
+    z: f64,
 }
 
-impl ByteParser for Quaternion {
-    fn parse_bytes(bytes: &[u8], ptr: &mut usize) -> Self {
-        let w = f64::parse_bytes(bytes, ptr);
-        let x = f64::parse_bytes(bytes, ptr);
-        let y = f64::parse_bytes(bytes, ptr);
-        let z = f64::parse_bytes(bytes, ptr);
+impl Quaternion {
+    pub fn roll(&self) -> f64 {
+        let Self { w, x, y, z } = self;
 
-        Self { w, x, y, z }
+        return f64::atan2(2.0 * (w * x + y * z), 1.0 - 2.0 * (x * x + y * y));
     }
-}
 
-pub struct Transform3D {
-    pub translation: Translate3D,
-    pub rotation: Quaternion,
-}
+    pub fn pitch(&self) -> f64 {
+        let Self { w, x, y, z } = self;
+        let ratio = 2.0 * (w * y - z * x);
 
-impl ByteParser for Transform3D {
-    fn parse_bytes(bytes: &[u8], ptr: &mut usize) -> Self {
-        let translation = Translate3D::parse_bytes(bytes, ptr);
-        let rotation = Quaternion::parse_bytes(bytes, ptr);
-
-        Transform3D {
-            translation,
-            rotation,
+        if ratio.abs() >= 1.0 {
+            return f64::copysign(f64::consts::FRAC_PI_2, ratio);
+        } else {
+            return f64::asin(ratio);
         }
     }
-}
 
-pub struct PhotonPipelineMetadata {
-    pub seqid: u64,
-    pub capture_time: Duration,
-    pub publish_time: Duration,
-}
+    pub fn yaw(&self) -> f64 {
+        let Self { w, x, y, z } = self;
 
-impl ByteParser for PhotonPipelineMetadata {
-    fn parse_bytes(bytes: &[u8], ptr: &mut usize) -> Self {
-        let seqid = u64::parse_bytes(bytes, ptr);
-        let capture_us = u64::parse_bytes(bytes, ptr);
-        let publish_us = u64::parse_bytes(bytes, ptr);
-
-        PhotonPipelineMetadata {
-            seqid: seqid as u64,
-            capture_time: Duration::from_micros(capture_us as u64),
-            publish_time: Duration::from_micros(publish_us as u64),
-        }
+        return f64::atan2(2.0 * (w * z + x * y), 1.0 - 2.0 * (y * y + z * z));
     }
 }
 
+impl Eq for Quaternion {}
+impl Hash for Quaternion {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.w.to_bits().hash(state);
+        self.x.to_bits().hash(state);
+        self.y.to_bits().hash(state);
+        self.z.to_bits().hash(state);
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Deserialize)]
+pub struct Translate3D {
+    x: f64,
+    y: f64,
+    z: f64,
+}
+
+impl Eq for Translate3D {}
+impl Hash for Translate3D {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.x.to_bits().hash(state);
+        self.y.to_bits().hash(state);
+        self.z.to_bits().hash(state);
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Deserialize)]
 pub struct TargetCorner {
     pub x: f64,
     pub y: f64,
 }
 
-impl ByteParser for TargetCorner {
-    fn parse_bytes(bytes: &[u8], ptr: &mut usize) -> Self {
-        let x = f64::parse_bytes(bytes, ptr);
-        let y = f64::parse_bytes(bytes, ptr);
-
-        TargetCorner { x, y }
+impl Eq for TargetCorner {}
+impl Hash for TargetCorner {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.x.to_bits().hash(state);
+        self.y.to_bits().hash(state);
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Deserialize)]
+pub struct DetectedObject {
+    #[serde(deserialize_with = "deser::u64")]
+    pub id: u64,
+    pub confidence: f32,
+}
+
+impl Eq for DetectedObject {}
+impl Hash for DetectedObject {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.id.hash(state);
+        self.confidence.to_bits().hash(state);
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Deserialize)]
+pub struct TargetTransforms {
+    pub best: Transform3D,
+    pub alt: Transform3D,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Deserialize)]
+pub struct Transform3D {
+    translation: Translate3D,
+    rotation: Quaternion,
+}
+
+#[derive(Clone, Debug, PartialEq, Deserialize)]
+pub struct PNPResult {
+    pub best: Transform3D,
+    pub alt: Transform3D,
+    pub error: f64,
+    pub alt_error: f64,
+    pub ambiguity: f64,
+}
+
+impl Eq for PNPResult {}
+impl Hash for PNPResult {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.best.hash(state);
+        self.alt.hash(state);
+        self.error.to_bits().hash(state);
+        self.alt_error.to_bits().hash(state);
+        self.ambiguity.to_bits().hash(state);
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Deserialize)]
+pub struct PhotonPipelineMetadata {
+    #[serde(deserialize_with = "deser::u64")]
+    pub seqid: u64,
+    #[serde(deserialize_with = "deser::duration")]
+    pub capture_time: Duration,
+    #[serde(deserialize_with = "deser::duration")]
+    pub publish_time: Duration,
+}
+
+#[derive(Clone, Debug, PartialEq, Deserialize)]
 pub struct PhotonTrackedTarget {
     pub yaw: f64,
     pub pitch: f64,
     pub area: f64,
     pub skew: f64,
-    pub fiducial_id: i32,
-    pub object_detect_id: i32,
-    pub object_detect_conf: f32,
-    pub best_camera_to_target: Transform3D,
-    pub alt_camera_to_target: Transform3D,
-    pub min_area_rect_corners: Vec<TargetCorner>,
+    #[serde(deserialize_with = "deser::ficudial_id")]
+    pub fiducial_id: Option<u32>,
+    #[serde(flatten)]
+    pub detected: DetectedObject,
+    #[serde(flatten)]
+    pub to_target: TargetTransforms,
+    #[serde(deserialize_with = "deser::vec")]
+    pub area_rect_corners: Vec<TargetCorner>,
+    #[serde(deserialize_with = "deser::vec")]
     pub detected_corners: Vec<TargetCorner>,
 }
 
-impl ByteParser for PhotonTrackedTarget {
-    fn parse_bytes(bytes: &[u8], ptr: &mut usize) -> Self {
-        let yaw = f64::parse_bytes(bytes, ptr);
-        let pitch = f64::parse_bytes(bytes, ptr);
-        let area = f64::parse_bytes(bytes, ptr);
-        let skew = f64::parse_bytes(bytes, ptr);
-        let fiducial_id = i32::parse_bytes(bytes, ptr);
-        let object_detect_id = i32::parse_bytes(bytes, ptr);
-        let object_detect_conf = f32::parse_bytes(bytes, ptr);
-        let best_camera_to_target = Transform3D::parse_bytes(bytes, ptr);
-        let alt_camera_to_target = Transform3D::parse_bytes(bytes, ptr);
-        let min_area_rect_corners = Vec::<TargetCorner>::parse_bytes(bytes, ptr);
-        let detected_corners = Vec::<TargetCorner>::parse_bytes(bytes, ptr);
-
-        PhotonTrackedTarget {
-            yaw,
-            pitch,
-            area,
-            skew,
-            fiducial_id,
-            object_detect_id,
-            object_detect_conf,
-            best_camera_to_target,
-            alt_camera_to_target,
-            min_area_rect_corners,
-            detected_corners,
-        }
+impl Eq for PhotonTrackedTarget {}
+impl Hash for PhotonTrackedTarget {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.yaw.to_bits().hash(state);
+        self.pitch.to_bits().hash(state);
+        self.area.to_bits().hash(state);
+        self.skew.to_bits().hash(state);
+        self.fiducial_id.hash(state);
+        self.detected.hash(state);
+        self.to_target.hash(state);
+        self.area_rect_corners.hash(state);
+        self.detected_corners.hash(state);
     }
 }
 
-pub struct PnpResult {
-    pub best: Transform3D,
-    pub alt: Transform3D,
-    pub reproj_error: f64,
-    pub alt_reproj_error: f64,
-    pub ambiguity: f64,
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Deserialize)]
+pub struct MultiTargetPNP {
+    pub pnp: PNPResult,
+    #[serde(deserialize_with = "deser::u16")]
+    pub num_fiducials: u16,
 }
 
-impl ByteParser for PnpResult {
-    fn parse_bytes(bytes: &[u8], ptr: &mut usize) -> Self {
-        let best = Transform3D::parse_bytes(bytes, ptr);
-        let alt = Transform3D::parse_bytes(bytes, ptr);
-        let reproj_error = f64::parse_bytes(bytes, ptr);
-        let alt_reproj_error = f64::parse_bytes(bytes, ptr);
-        let ambiguity = f64::parse_bytes(bytes, ptr);
-
-        PnpResult {
-            best,
-            alt,
-            reproj_error,
-            alt_reproj_error,
-            ambiguity,
-        }
-    }
-}
-
-pub struct PhotonResult {
+#[derive(Clone, Debug, PartialEq, Deserialize)]
+pub struct PhotonRes {
     pub metadata: PhotonPipelineMetadata,
-    pub targets: Vec<PhotonTrackedTarget>,
-    pub pnp_results: Vec<PnpResult>,
-}
-
-impl ByteParser for PhotonResult {
-    fn parse_bytes(bytes: &[u8], ptr: &mut usize) -> Self {
-        let metadata = PhotonPipelineMetadata::parse_bytes(bytes, ptr);
-        let targets = Vec::<PhotonTrackedTarget>::parse_bytes(bytes, ptr);
-        let pnp_results = Vec::<PnpResult>::parse_bytes(bytes, ptr);
-
-        PhotonResult {
-            metadata,
-            targets,
-            pnp_results,
-        }
-    }
+    pub target: Vec<PhotonTrackedTarget>,
+    pub pnp: Option<MultiTargetPNP>,
 }
