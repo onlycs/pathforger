@@ -1,10 +1,8 @@
-pub mod deser;
 pub mod error;
 
+use crate::prelude::*;
 use std::time::Duration;
 
-use bincode::{config, serde::decode_from_slice};
-use deser::*;
 use error::*;
 use futures::future::BoxFuture;
 use nt_client::{
@@ -15,6 +13,8 @@ use nt_client::{
 };
 use tokio::runtime;
 
+pub trait ThreadSafe = Send + Sync + 'static;
+
 pub async fn worker<'a, C0, C1, C2>(
     camera: String,
     on_robot_pose_update: C0,
@@ -22,9 +22,9 @@ pub async fn worker<'a, C0, C1, C2>(
     on_dest_update: C2,
 ) -> Result<!, PhotonWorkerError>
 where
-    C0: for<'f> Fn(&'f mut Publisher<RawData>, Transform3D) -> BoxFuture<'f, ()> + Send + Sync + 'a,
-    C1: for<'f> Fn(&'f mut Publisher<RawData>, PhotonRes) -> BoxFuture<'f, ()> + Send + Sync + 'a,
-    C2: for<'f> Fn(&'f mut Publisher<RawData>, Transform3D) -> BoxFuture<'f, ()> + Send + Sync + 'a,
+    C0: for<'f> Fn(&'f mut Publisher<RawData>, Pose2d) -> BoxFuture<'f, ()> + ThreadSafe,
+    C1: for<'f> Fn(&'f mut Publisher<RawData>, PhotonResult) -> BoxFuture<'f, ()> + ThreadSafe,
+    C2: for<'f> Fn(&'f mut Publisher<RawData>, Pose2d) -> BoxFuture<'f, ()> + ThreadSafe,
 {
     let nt = Client::new(Default::default());
 
@@ -73,7 +73,7 @@ where
         match photon_res {
             ReceivedMessage::Updated((_, value)) => {
                 if let Some(bytes) = value.as_slice() {
-                    let (result, _) = decode_from_slice(bytes, config::legacy())?;
+                    let result = deserialize(bytes)?;
                     rt.block_on(on_photon_update(&mut path_pub, result));
                 };
             }
@@ -83,7 +83,7 @@ where
         match pose_res {
             ReceivedMessage::Updated((_, value)) => {
                 if let Some(bytes) = value.as_slice() {
-                    let (pose, _) = decode_from_slice(bytes, config::legacy())?;
+                    let pose = deserialize(bytes)?;
                     rt.block_on(on_robot_pose_update(&mut path_pub, pose));
                 };
             }
@@ -93,7 +93,7 @@ where
         match dest_res {
             ReceivedMessage::Updated((_, value)) => {
                 if let Some(bytes) = value.as_slice() {
-                    let (dest, _) = decode_from_slice(bytes, config::legacy())?;
+                    let dest = deserialize(bytes)?;
                     rt.block_on(on_dest_update(&mut path_pub, dest));
                 };
             }

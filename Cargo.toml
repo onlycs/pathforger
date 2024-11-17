@@ -4,9 +4,10 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-bincode = { version = "2.0.0-rc", features = ["serde"] }
 futures = "0.3.31"
 nt_client = "0.2.0"
-serde = { version = "1.0.213", features = ["derive"] }
 thiserror = { git = "https://github.com/onlycs/thiserror" }
 tokio = { version = "1.40.0", features = ["full"] }
+
+[dev-dependencies]
+rand = "0.8.5"

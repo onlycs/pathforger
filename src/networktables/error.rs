@@ -5,6 +5,8 @@ use tokio::sync::broadcast::error::RecvError;
 
 use thiserror::Error;
 
+use super::DeserializeError;
+
 #[derive(Error, Debug)]
 pub enum PhotonWorkerError {
     #[error("At {location}: Networktables failed to recieve:\n{source}")]
@@ -34,7 +36,7 @@ pub enum PhotonWorkerError {
     #[error("At {location}: Deserialization error:\n{source}")]
     DeserializationError {
         #[from]
-        source: bincode::error::DecodeError,
+        source: DeserializeError,
         location: &'static Location<'static>,
         backtrace: Backtrace,
     },
