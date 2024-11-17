@@ -11,10 +11,9 @@ macro_rules! join_bytes {
     };
 }
 
-fn dummy_duration(rng: &mut ThreadRng) -> (Duration, Vec<u8>) {
-    let micros: i64 = rng.gen();
-    let duration = Duration::from_micros(micros as u64);
-    (duration, micros.to_le_bytes().to_vec())
+fn dummy_u16(rng: &mut ThreadRng) -> (u16, Vec<u8>) {
+    let dummy = rng.gen::<i16>().abs();
+    (dummy as u16, dummy.to_le_bytes().to_vec())
 }
 
 fn dummy_u64(rng: &mut ThreadRng) -> (u64, Vec<u8>) {
@@ -22,9 +21,10 @@ fn dummy_u64(rng: &mut ThreadRng) -> (u64, Vec<u8>) {
     (dummy as u64, dummy.to_le_bytes().to_vec())
 }
 
-fn dummy_u16(rng: &mut ThreadRng) -> (u16, Vec<u8>) {
-    let dummy = rng.gen::<i16>().abs();
-    (dummy as u16, dummy.to_le_bytes().to_vec())
+fn dummy_duration(rng: &mut ThreadRng) -> (Duration, Vec<u8>) {
+    let micros: i64 = rng.gen();
+    let duration = Duration::from_micros(micros as u64);
+    (duration, micros.to_le_bytes().to_vec())
 }
 
 fn dummy_fiducial_id(rng: &mut ThreadRng) -> (FiducialId, Vec<u8>) {
@@ -255,6 +255,30 @@ fn dummy_photon_result(rng: &mut ThreadRng) -> (PhotonResult, Vec<u8>) {
     )
 }
 
+fn dummy_rotate2d(rng: &mut ThreadRng) -> (Rotate2d, Vec<u8>) {
+    let rad: f64 = rng.gen();
+    let bytes = rad.to_le_bytes().to_vec();
+
+    (Rotate2d { rad }, bytes)
+}
+
+fn dummy_translate2d(rng: &mut ThreadRng) -> (Translate2d, Vec<u8>) {
+    let x: f64 = rng.gen();
+    let y: f64 = rng.gen();
+    let bytes = join_bytes!(x.to_le_bytes(), y.to_le_bytes());
+
+    (Translate2d { x, y }, bytes)
+}
+
+fn dummy_pose2d(rng: &mut ThreadRng) -> (Pose2d, Vec<u8>) {
+    let (translate, translate_bytes) = dummy_translate2d(rng);
+    let (rotate, rotate_bytes) = dummy_rotate2d(rng);
+
+    let bytes = join_bytes!(translate_bytes, rotate_bytes);
+
+    (Pose2d { translate, rotate }, bytes)
+}
+
 macro_rules! test_for {
     ($test:ident, $dummy:ident, $ty:ty) => {
         #[test]
@@ -271,12 +295,16 @@ macro_rules! test_for {
 
 test_for!(quaternion, dummy_quaternion, Quaternion);
 test_for!(translate3d, dummy_translate3d, Translate3d);
-test_for!(target_corner, dummy_target_corner, TargetCorner);
-test_for!(detected_object, dummy_detected_object, DetectedObject);
 test_for!(transform3d, dummy_transform3d, Transform3d);
+test_for!(detected_object, dummy_detected_object, DetectedObject);
 test_for!(target_transforms, dummy_target_transforms, TargetTransforms);
+test_for!(target_corner, dummy_target_corner, TargetCorner);
 test_for!(pnp_result, dummy_pnp_result, PNPResult);
 test_for!(metadata, dummy_pipeline_metadata, PhotonPipelineMetadata);
 test_for!(tracked_target, dummy_tracked_target, PhotonTrackedTarget);
 test_for!(multi_target_pnp, dummy_multi_target_pnp, MultiTargetPNP);
 test_for!(photon_result, dummy_photon_result, PhotonResult);
+
+test_for!(rotate2d, dummy_rotate2d, Rotate2d);
+test_for!(translate2d, dummy_translate2d, Translate2d);
+test_for!(pose2d, dummy_pose2d, Pose2d);
