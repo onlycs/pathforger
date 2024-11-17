@@ -3,12 +3,12 @@ mod builtin;
 #[cfg(test)]
 mod test;
 
+use crate::prelude::*;
 use std::{
     hash::{Hash, Hasher},
     io::Cursor,
     time::Duration,
 };
-
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -28,13 +28,33 @@ trait FpHash {
 
 impl FpHash for f64 {
     fn hash(&self, h: &mut impl Hasher) {
-        self.to_le_bytes().hash(h);
+        if self.is_nan() {
+            f64::NAN.to_le_bytes().hash(h);
+        } else {
+            self.to_le_bytes().hash(h);
+        }
     }
 }
 
 impl FpHash for f32 {
     fn hash(&self, h: &mut impl Hasher) {
-        self.to_le_bytes().hash(h);
+        if self.is_nan() {
+            f32::NAN.to_le_bytes().hash(h);
+        } else {
+            self.to_le_bytes().hash(h);
+        }
+    }
+}
+
+impl FpHash for Angle {
+    fn hash(&self, h: &mut impl Hasher) {
+        self.get::<radian>().hash(h);
+    }
+}
+
+impl FpHash for Length {
+    fn hash(&self, h: &mut impl Hasher) {
+        self.get::<meter>().hash(h);
     }
 }
 
@@ -196,20 +216,20 @@ define_types! {
 // robot types
 define_types! {
     [manual(Eq, Hash)]
-    #[derive(Clone, Copy, Debug, PartialEq)]
+    #[derive(Clone, Copy, Debug, Default, PartialEq)]
     pub struct Rotate2d {
-        pub rad: f64,
+        pub angle: Angle,
     }
 
     [manual(Eq, Hash)]
-    #[derive(Clone, Copy, Debug, PartialEq)]
+    #[derive(Clone, Copy, Debug, Default, PartialEq)]
     pub struct Translate2d {
-        pub x: f64,
-        pub y: f64,
+        pub x: Length,
+        pub y: Length,
     }
 
     [manual(Eq, Hash)]
-    #[derive(Clone, Copy, Debug, PartialEq)]
+    #[derive(Clone, Copy, Debug, Default, PartialEq)]
     pub struct Pose2d {
         pub translate: Translate2d,
         pub rotate: Rotate2d,

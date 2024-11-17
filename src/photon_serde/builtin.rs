@@ -2,6 +2,7 @@ use std::io::Read;
 use std::u8;
 
 use super::*;
+use crate::prelude::*;
 
 macro_rules! read_fixed {
     ($buf:expr, $len:expr) => {{
@@ -48,6 +49,18 @@ num_type!(f32);
 impl Deserialize for bool {
     fn deserialize(data: &mut Cursor<&[u8]>) -> Result<Self, DeserializeError> {
         Ok(u8::deserialize(data)? != 0)
+    }
+}
+
+impl Deserialize for Angle {
+    fn deserialize(data: &mut Cursor<&[u8]>) -> Result<Self, DeserializeError> {
+        Ok(Angle::new::<radian>(f64::deserialize(data)?))
+    }
+}
+
+impl Deserialize for Length {
+    fn deserialize(data: &mut Cursor<&[u8]>) -> Result<Self, DeserializeError> {
+        Ok(Length::new::<meter>(f64::deserialize(data)?))
     }
 }
 

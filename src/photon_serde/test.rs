@@ -73,6 +73,18 @@ fn dummy_optional<T>(
     (Some(data), bytes)
 }
 
+fn dummy_angle(rng: &mut ThreadRng) -> (Angle, Vec<u8>) {
+    let dummy = rng.gen::<f64>();
+    let angle = Angle::new::<radian>(dummy);
+    (angle, dummy.to_le_bytes().to_vec())
+}
+
+fn dummy_length(rng: &mut ThreadRng) -> (Length, Vec<u8>) {
+    let dummy = rng.gen::<f64>();
+    let length = Length::new::<meter>(dummy);
+    (length, dummy.to_le_bytes().to_vec())
+}
+
 fn dummy_quaternion(rng: &mut ThreadRng) -> (Quaternion, Vec<u8>) {
     let w: f64 = rng.gen();
     let x: f64 = rng.gen();
@@ -256,16 +268,16 @@ fn dummy_photon_result(rng: &mut ThreadRng) -> (PhotonResult, Vec<u8>) {
 }
 
 fn dummy_rotate2d(rng: &mut ThreadRng) -> (Rotate2d, Vec<u8>) {
-    let rad: f64 = rng.gen();
-    let bytes = rad.to_le_bytes().to_vec();
+    let (angle, bytes) = dummy_angle(rng);
 
-    (Rotate2d { rad }, bytes)
+    (Rotate2d { angle }, bytes)
 }
 
 fn dummy_translate2d(rng: &mut ThreadRng) -> (Translate2d, Vec<u8>) {
-    let x: f64 = rng.gen();
-    let y: f64 = rng.gen();
-    let bytes = join_bytes!(x.to_le_bytes(), y.to_le_bytes());
+    let (x, x_bytes) = dummy_length(rng);
+    let (y, y_bytes) = dummy_length(rng);
+
+    let bytes = join_bytes!(x_bytes, y_bytes);
 
     (Translate2d { x, y }, bytes)
 }

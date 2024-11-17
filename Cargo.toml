@@ -5,9 +5,16 @@ edition = "2021"
 
 [dependencies]
 futures = "0.3.31"
+itertools = "0.13.0"
 nt_client = "0.2.0"
 thiserror = { git = "https://github.com/onlycs/thiserror" }
 tokio = { version = "1.40.0", features = ["full"] }
+uom = { version = "0.36.0", default-features = false, features = [
+    "autoconvert",
+    "f64",
+    "si",
+    "std",
+] }
 
 [dev-dependencies]
 rand = "0.8.5"
