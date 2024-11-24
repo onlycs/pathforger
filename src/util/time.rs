@@ -22,3 +22,11 @@ pub fn instant_of(dur: Duration) -> Instant {
 
     *start + dur
 }
+
+pub fn duration_of(inst: Instant) -> Duration {
+    let Some(start) = (unsafe { PROGRAM_START.as_ref() }) else {
+        panic!("PROGRAM_START not initialized");
+    };
+
+    inst - *start
+}

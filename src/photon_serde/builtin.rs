@@ -1,8 +1,8 @@
 use std::io::Read;
 use std::u8;
 
-use super::*;
 use crate::prelude::*;
+use photon_serde::*;
 
 macro_rules! read_fixed {
     ($buf:expr, $len:expr) => {{

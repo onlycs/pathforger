@@ -6,6 +6,9 @@ edition = "2021"
 [dependencies]
 futures = "0.3.31"
 itertools = "0.13.0"
+lapjv = { git = "https://github.com/onlycs/lapjv-rust" }
+ndarray = "0.15.2"
+ndarray-linalg = "0.16.0"
 nt_client = "0.2.0"
 thiserror = { git = "https://github.com/onlycs/thiserror" }
 tokio = { version = "1.40.0", features = ["full"] }

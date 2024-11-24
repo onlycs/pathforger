@@ -236,6 +236,12 @@ define_types! {
     }
 }
 
+impl From<Translate2d> for (Length, Length) {
+    fn from(value: Translate2d) -> Self {
+        (value.x, value.y)
+    }
+}
+
 pub mod prelude {
     pub use super::*;
 }
