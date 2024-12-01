@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 futures = "0.3.31"
+ioutrack = { git = "https://github.com/onlycs/ioutrack", version = "0.3.0" }
 itertools = "0.13.0"
 lapjv = { git = "https://github.com/onlycs/lapjv-rust" }
 ndarray = "0.15.2"
